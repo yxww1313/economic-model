@@ -27,7 +27,7 @@ try:
     fm.fontManager.addfont(font_path)
     plt.rcParams['font.family'] = fm.FontProperties(fname=font_path).get_name()
     plt.rcParams['axes.unicode_minus'] = False
-    st.success(" 中文字体加载成功")
+    
 except FileNotFoundError:
     st.warning(" 字体文件未找到，图表将使用默认英文字体")
     plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
