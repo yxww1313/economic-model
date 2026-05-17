@@ -9,11 +9,22 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as fm
 import seaborn as sns
 from io import StringIO
-plt.rcParams['font.sans-serif'] = ['SimHei']  # 或 ['Microsoft YaHei']
-plt.rcParams['axes.unicode_minus'] = False
+# 使用 Streamlit 静态文件服务加载字体
+font_path = "app/static/NotoSansSC-Regular.otf"
+try:
+    fm.fontManager.addfont(font_path)
+    # 设置 Matplotlib 的全局字体
+    plt.rcParams['font.family'] = fm.FontProperties(fname=font_path).get_name()
+    plt.rcParams['axes.unicode_minus'] = False
+    st.success("字体加载成功，图表将正确显示中文。")
+except FileNotFoundError:
+    # 字体文件缺失时的降级方案
+    st.warning("字体文件未找到，图表将使用默认英文字体。")
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
 # ================== 页面配置 ==================
 st.set_page_config(
     page_title="经济增长建模工作台",
