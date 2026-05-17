@@ -10,21 +10,9 @@ import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 import matplotlib.font_manager as fm
+import matplotlib.pyplot as plt
 import seaborn as sns
 from io import StringIO
-# 使用 Streamlit 静态文件服务加载字体
-font_path = "static/NotoSansSC-Regular.otf"
-try:
-    fm.fontManager.addfont(font_path)
-    # 设置 Matplotlib 的全局字体
-    plt.rcParams['font.family'] = fm.FontProperties(fname=font_path).get_name()
-    plt.rcParams['axes.unicode_minus'] = False
-    st.success("字体加载成功，图表将正确显示中文。")
-except FileNotFoundError:
-    # 字体文件缺失时的降级方案
-    st.warning("字体文件未找到，图表将使用默认英文字体。")
-    plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
-    plt.rcParams['axes.unicode_minus'] = False
 # ================== 页面配置 ==================
 st.set_page_config(
     page_title="经济增长建模工作台",
@@ -32,6 +20,18 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ================== 字体加载（放在 set_page_config 之后） ==================
+font_path = "static/NotoSansCJKsc-Regular.otf"
+try:
+    fm.fontManager.addfont(font_path)
+    plt.rcParams['font.family'] = fm.FontProperties(fname=font_path).get_name()
+    plt.rcParams['axes.unicode_minus'] = False
+    st.success(" 中文字体加载成功")
+except FileNotFoundError:
+    st.warning(" 字体文件未找到，图表将使用默认英文字体")
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
 
 # ================== 1. 经济故事背景与理论脉络 ==================
 with st.expander(" 经济故事背景 & 理论脉络", expanded=False):
