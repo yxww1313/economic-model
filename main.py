@@ -9,7 +9,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
-import matplotlib.pyplot as fm
+import matplotlib.font_manager as fm
 import seaborn as sns
 from io import StringIO
 # 使用 Streamlit 静态文件服务加载字体
