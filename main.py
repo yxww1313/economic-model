@@ -13,7 +13,7 @@ import matplotlib.pyplot as fm
 import seaborn as sns
 from io import StringIO
 # 使用 Streamlit 静态文件服务加载字体
-font_path = "app/static/NotoSansSC-Regular.otf"
+font_path = "static/NotoSansSC-Regular.otf"
 try:
     fm.fontManager.addfont(font_path)
     # 设置 Matplotlib 的全局字体
