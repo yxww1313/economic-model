@@ -288,20 +288,147 @@ ax4.set_title("残差分布 (正态性检查)")
 ax4.set_xlabel("残差")
 st.pyplot(fig4)
 
-# ================== 8. 动态总结与建议 ==================
+# ================== 8. 动态总结与建议（增强解释力） ==================
 st.markdown("---")
-st.subheader(" 计量经济解读与动态反馈")
-significant_vars = coeff_table[coeff_table['P>|t|'] < 0.05]['变量'].tolist()
-if 'const' in significant_vars: significant_vars.remove('const')
-if len(significant_vars) > 0:
-    st.write(f" 在5%显著性水平下，变量 **{', '.join(significant_vars)}** 对被解释变量有显著影响。")
+st.subheader("📊 计量经济解读与动态反馈")
+
+# ---------- 1. 整体模型显著性 ----------
+st.markdown("#### 模型整体显著性（F检验）")
+if f_pvalue < 0.01:
+    st.success(f"✅ **F检验 p 值 = {f_pvalue:.4f} < 0.01**，在1%水平上高度显著。所有解释变量联合对GDP增长率具有极强的解释能力。")
+elif f_pvalue < 0.05:
+    st.success(f"✅ **F检验 p 值 = {f_pvalue:.4f} < 0.05**，在5%水平上显著。解释变量联合对被解释变量有统计上显著的解释力。")
+elif f_pvalue < 0.1:
+    st.warning(f"⚠️ **F检验 p 值 = {f_pvalue:.4f} < 0.1**，仅在10%水平上边际显著。模型整体解释力偏弱。")
 else:
-    st.write(" 当前模型中无变量在5%水平下显著，可能需要调整解释变量组合或考虑非线性结构。")
+    st.error(f"❌ **F检验 p 值 = {f_pvalue:.4f} ≥ 0.1**，模型整体不显著。当前选择的解释变量无法联合解释GDP增长率的变动，请考虑更换变量组合或尝试非线性形式。")
+
+# ---------- 2. 单个变量显著性、符号与经济意义 ----------
+st.markdown("#### 各解释变量的影响（t检验与系数经济含义）")
+# 预设理论预期符号（根据增长理论）
+expected_sign = {
+    'invest': ('positive', '物质资本积累促进增长 → 系数应为正'),
+    'hc': ('positive', '人力资本提升劳动生产率 → 系数应为正'),
+    'rd': ('positive', '研发投入驱动技术创新 → 系数应为正'),
+    'trade': ('positive', '贸易开放带来技术溢出 → 系数应为正'),
+    'gov': ('negative', '政府规模过大可能挤出私人投资 → 系数预期为负'),
+    'const': ('neutral', '截距项无固定预期')
+}
+# 如果使用非线性模型，还需要处理平方项
+if use_nonlinear and len(selected_ivs) == 1:
+    x_name = selected_ivs[0]
+    # 平方项符号解读
+    sq_name = f"{x_name}_sq" if 'sq' not in coeff_table['变量'].values else 'sq'
+    # 需要从coeff_table中获取平方项系数
+    sq_coeff = coeff_table[coeff_table['变量'].str.contains('sq|²', na=False)]['系数'].values[0] if len(coeff_table[coeff_table['变量'].str.contains('sq|²', na=False)])>0 else None
+    # 线性项系数
+    linear_coeff = coeff_table[coeff_table['变量'] == x_name]['系数'].values[0] if len(coeff_table[coeff_table['变量']==x_name])>0 else None
+
+# 生成解释
+for _, row in coeff_table.iterrows():
+    var = row['变量']
+    if var == 'const':
+        continue
+    coeff = row['系数']
+    pval = row['P>|t|']
+    sig_star = row['显著性']
+    sign_actual = 'positive' if coeff > 0 else 'negative'
+
+    # 理论预期判断
+    expected = expected_sign.get(var, (None, '无明确理论预期'))
+    expected_sign_dir, expected_desc = expected if expected[0] is not None else (None, '无明确理论预期')
+
+    # 显著性描述
+    if pval < 0.01:
+        sig_text = "在1%水平上高度显著"
+    elif pval < 0.05:
+        sig_text = "在5%水平上显著"
+    elif pval < 0.1:
+        sig_text = "在10%水平上边际显著"
+    else:
+        sig_text = "不显著"
+
+    # 经济意义解读：系数的边际效应
+    effect_desc = f"在其他条件不变时，{var} 每增加1个单位，GDP增长率平均变化 {coeff:.4f} 个百分点。"
+
+    # 符号一致性判断
+    if expected_sign_dir == sign_actual:
+        sign_match = "✅ 符合理论预期"
+    elif expected_sign_dir is None:
+        sign_match = "ℹ️ 无固定理论预期"
+    else:
+        sign_match = f"⚠️ 符号与理论预期相反（预期{expected_sign_dir}）"
+
+    st.write(f"- **{var}** {sig_text} {sig_star}：系数 = **{coeff:.4f}**，{effect_desc} {sign_match}。{expected_desc if expected_sign_dir else ''}")
+
+# 如果是非线性模型，额外解读二次项的经济含义
+if use_nonlinear and len(selected_ivs) == 1:
+    st.markdown("#### 📉 非线性（二次项）模型边际效应解读")
+    x_name = selected_ivs[0]
+    # 找到平方项系数
+    sq_row = coeff_table[coeff_table['变量'].str.contains('sq|²', na=False)]
+    if not sq_row.empty:
+        sq_coeff = sq_row.iloc[0]['系数']
+        sq_pval = sq_row.iloc[0]['P>|t|']
+        linear_coeff = coeff_table[coeff_table['变量'] == x_name].iloc[0]['系数']
+        if sq_coeff > 0 and sq_pval < 0.1:
+            st.info(f"📈 二次项系数为正（{sq_coeff:.4f}），且{ '显著' if sq_pval<0.05 else '边际显著' }，表明{x_name}对增长的促进具有**加速效应**（边际贡献递增）。")
+        elif sq_coeff < 0 and sq_pval < 0.1:
+            # 计算拐点
+            turning_point = -linear_coeff / (2 * sq_coeff) if sq_coeff != 0 else None
+            st.info(f"📉 二次项系数为负（{sq_coeff:.4f}），且{ '显著' if sq_pval<0.05 else '边际显著' }，表明{x_name}对增长存在**边际递减效应**（倒U型关系）。")
+            if turning_point and turning_point > 0:
+                st.info(f"   拐点约为 {turning_point:.2f}：当 {x_name} < {turning_point:.2f} 时正向促进，超过后转为抑制。")
+        else:
+            st.info(f"二次项系数 {sq_coeff:.4f} 不显著，未发现明确的非线性关系。")
+
+# ---------- 3. 拟合优度（R²）解读 ----------
+st.markdown("#### 📈 模型拟合优度（R²与调整R²）")
+r2_percent = r2 * 100
+r2_adj_percent = r2_adj * 100
+st.write(f"- **R² = {r2:.4f}**：意味着模型可以解释GDP增长率 **{r2_percent:.1f}%** 的变异。")
+st.write(f"- **调整后R² = {r2_adj:.4f}**：考虑了自变量个数，避免过度拟合，较适合模型比较。")
 
 if r2 < 0.3:
-    st.info(" R²较低，可能遗漏重要变量（如制度质量、自然资源等），或关系高度非线性。")
-elif r2 > 0.7:
-    st.success(" R²较高，模型拟合优度良好。")
+    st.info("🔍 **R²偏低**，可能原因：① 遗漏重要解释变量（如制度质量、自然资源、地理因素）；② 变量间存在非线性或交互效应；③ 数据噪声较大。建议尝试加入更多变量或使用非线性/交互项。")
+elif r2 < 0.6:
+    st.info("📊 **R²中等**，模型具有一定解释力，但仍有相当部分变异未被解释。可考虑引入更精细的控制变量或理论扩展。")
+else:
+    st.success("✨ **R²较高**，模型拟合良好。当前选择的解释变量能够有效捕捉GDP增长率的主要驱动因素。")
+
+# ---------- 4. 模型诊断提示（基于已有图表） ----------
+st.markdown("#### 🔧 模型诊断快速提示")
+st.write("请观察上方的**残差图**与**残差分布直方图**：")
+st.write("- **残差 vs 拟合值图**：若点随机散布在零线两侧、无明显漏斗形或曲线模式，则满足同方差性和线性假设。")
+st.write("- **残差直方图**：若近似正态分布（钟形），则满足正态性假设，t检验和F检验可靠。")
+st.write("若发现异方差（漏斗形）或严重偏态，可考虑使用异方差稳健标准误（如HC3）或对变量进行变换（取对数）。")
+
+# ---------- 5. 动态建议汇总 ----------
+st.markdown("#### 💡 综合建议")
+# 根据显著变量数量和符号一致性给出建议
+sig_count = len([v for v in coeff_table['变量'] if v != 'const' and coeff_table[coeff_table['变量']==v]['P>|t|'].values[0] < 0.05])
+correct_sign_count = 0
+for var in selected_ivs:
+    if var in expected_sign and expected_sign[var][0] is not None:
+        coeff_val = coeff_table[coeff_table['变量']==var]['系数'].values[0]
+        actual_sign = 'positive' if coeff_val > 0 else 'negative'
+        if actual_sign == expected_sign[var][0]:
+            correct_sign_count += 1
+
+if sig_count == len(selected_ivs) and correct_sign_count == len([v for v in selected_ivs if v in expected_sign and expected_sign[v][0] is not None]):
+    st.success("🎉 **模型表现优秀**：所有选入变量均显著且符号符合理论预期，实证结果有力地支持了新古典/内生增长理论。")
+elif sig_count > 0:
+    st.info(f"📌 **模型表现良好**：{sig_count}/{len(selected_ivs)} 个变量显著，其中 {correct_sign_count} 个符号与理论一致。可考虑剔除不显著或符号异常的变量以精简模型。")
+else:
+    st.warning("⚠️ **模型有待改进**：所有变量均不显著。建议：① 减少变量数量（多重共线性可能）；② 检查是否有重大遗漏变量；③ 尝试使用非线性形式（如二次项或交互项）。")
+
+# 针对政府支出负向预期但实际为正的特别提示
+if 'gov' in selected_ivs:
+    gov_coeff = coeff_table[coeff_table['变量']=='gov']['系数'].values[0]
+    gov_pval = coeff_table[coeff_table['变量']=='gov']['P>|t|'].values[0]
+    if gov_coeff > 0 and gov_pval < 0.1:
+        st.warning("🔔 **注意**：政府支出系数为正，与理论预期的负向挤出效应不符。可能原因是政府支出促进了公共投资或教育健康，需结合具体国别背景解释。")
 
 st.caption(
-    " 提示：随意组合解释变量并开启/关闭非线性选项，实时观察R²、t值、F值的变化。符合理论预期的变量应该具有正确的符号和显著性。")
+    "💡 **提示**：随意组合解释变量并开启/关闭非线性选项，实时观察R²、t值、F值的变化。符合理论预期的变量应具有正确的符号和显著性。"
+)
